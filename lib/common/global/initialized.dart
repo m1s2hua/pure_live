@@ -40,6 +40,13 @@ class AppInitializer {
   bool _isInitialized = false;
   LiveRoom? _initialRoom;
 
+  /// Optional single-instance namespace for a side-by-side test build.
+  ///
+  /// Empty for official builds so they keep forwarding to their own primary
+  /// window. A scoped build (`--dart-define=PURELIVE_INSTANCE_SCOPE=...`)
+  /// becomes its own primary instance and can run next to the installed app.
+  static const String _windowsInstanceScope = String.fromEnvironment('PURELIVE_INSTANCE_SCOPE');
+
   factory AppInitializer() => _instance;
   AppInitializer._internal();
 
@@ -157,7 +164,11 @@ class AppInitializer {
     if (!Platform.isWindows) return;
     try {
       final safeId = instanceId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
-      await WindowsSingleInstance.ensureSingleInstance(args, "PureLive_InstanceID_$safeId", bringWindowToFront: true);
+      await WindowsSingleInstance.ensureSingleInstance(
+        args,
+        "PureLive_InstanceID_$_windowsInstanceScope$safeId",
+        bringWindowToFront: true,
+      );
     } catch (e) {
       log('WindowsSingleInstance initialization failed: $e');
     }
