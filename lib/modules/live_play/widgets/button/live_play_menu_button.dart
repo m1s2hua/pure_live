@@ -5,6 +5,7 @@ import 'package:remixicon/remixicon.dart';
 import 'package:pure_live/common/index.dart';
 import 'package:pure_live/common/utils/live_url_tool.dart';
 import 'package:pure_live/common/utils/share_command_handler.dart';
+import 'package:pure_live/modules/live_play/dialogs/custom_source_dialog.dart';
 import 'package:pure_live/modules/live_play/dialogs/play_other.dart';
 import 'package:pure_live/modules/live_play/dialogs/room_timer_dialog.dart';
 import 'package:pure_live/common/utils/windows_multi_instance_launcher.dart';
@@ -74,6 +75,10 @@ class LivePlayMenuButton extends StatelessWidget {
 
       case 8:
         _openNewWindow();
+        break;
+
+      case 9:
+        _replacePlaybackSource(context);
         break;
     }
 
@@ -159,6 +164,10 @@ class LivePlayMenuButton extends StatelessWidget {
     );
   }
 
+  void _replacePlaybackSource(BuildContext context) {
+    CustomSourceDialog.show(context: context, controller: controller);
+  }
+
   void _openNewWindow() {
     final detail = controller.state.value.room.detail;
 
@@ -198,6 +207,8 @@ class LivePlayMenuButton extends StatelessWidget {
         _item(value: 7, icon: Icons.auto_awesome_rounded, text: i18n('local_interaction_title')),
 
       if (Platform.isWindows) _item(value: 8, icon: Icons.open_in_new_rounded, text: i18n('open_room_in_new_window')),
+
+      _item(value: 9, icon: Icons.swap_horiz_rounded, text: i18n('custom_play_source')),
     ];
   }
 

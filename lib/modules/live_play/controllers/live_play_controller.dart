@@ -40,6 +40,16 @@ typedef IptvPlayerStarter = Future<bool> Function(LiveRoom room);
 
 enum IptvPlaybackSwitchResult { started, superseded, failed }
 
+/// A user-pasted replacement source must be an absolute remote media URL.
+///
+/// Only the scheme and host are validated here; the native player remains the
+/// authority on whether the concrete stream is decodable.
+bool isValidCustomSourceUrl(String value) {
+  final uri = Uri.tryParse(value.trim());
+  if (uri == null) return false;
+  return (uri.scheme == 'http' || uri.scheme == 'https') && uri.host.isNotEmpty;
+}
+
 class LivePlayController extends GetxController
     with GetSingleTickerProviderStateMixin, WidgetsBindingObserver
     implements DanmakuSessionHost, PlayerSessionHost {
@@ -945,15 +955,66 @@ class LivePlayController extends GetxController
     return _switchToUrl(liveUrl, expectedRoom: liveRoom);
   }
 
-  Future<IptvPlaybackSwitchResult> _switchToUrl(String url, {required LiveRoom expectedRoom}) async {
+  /// Replaces the current room's playback with a user-supplied direct source.
+  ///
+  /// The room, danmaku socket and history entry are retained; only the media
+  /// source changes. Platform stream recovery is suppressed so the pasted URL
+  /// is never silently swapped back to a resolved platform stream. The override
+  /// is scoped to this room session and is not persisted.
+  Future<bool> playCustomSource(String url) async {
+    final currentRoom = state.value.room.detail;
+    final normalizedUrl = url.trim();
+    if (currentRoom == null || currentRoom.normalizedRoomId.isEmpty || !isValidCustomSourceUrl(normalizedUrl)) {
+      return false;
+    }
+
+    // Keep the platform's default-resolution marker cleared so a later refresh
+    // restores the user's preferred official quality instead of leaving the
+    // stale custom-source selection in place.
+    updatePlayer(
+      qualites: [LivePlayQuality(quality: i18n('custom_play_source'))],
+      currentQuality: 0,
+      hasUseDefaultResolution: false,
+    );
+
+    final IptvPlaybackSwitchResult result;
+    try {
+      result = await _switchToUrl(normalizedUrl, expectedRoom: currentRoom, allowSourceRecovery: false);
+    } catch (error, stackTrace) {
+      // `_switchToUrl` already published the room-level load error; absorb the
+      // exception here so a dialog caller only has to handle a false result.
+      developer.log(
+        'Custom playback source failed to open',
+        name: 'LivePlayController',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+    return result == IptvPlaybackSwitchResult.started;
+  }
+
+  Future<IptvPlaybackSwitchResult> _switchToUrl(
+    String url, {
+    required LiveRoom expectedRoom,
+    bool allowSourceRecovery = true,
+  }) async {
     final playbackEpoch = ++_iptvPlaybackEpoch;
     updateRoom(success: false, isLoading: true, loadError: null);
     updatePlayer(playUrls: [url], currentLineIndex: 0);
     try {
+      final bool started;
       final injectedStarter = _iptvPlayerStarter;
-      final started = injectedStarter != null
-          ? await injectedStarter(expectedRoom)
-          : await playerController.setDirectPlayer(room: expectedRoom, site: currentSite) != null;
+      if (injectedStarter != null) {
+        started = await injectedStarter(expectedRoom);
+      } else {
+        final controller = await playerController.setDirectPlayer(
+          room: expectedRoom,
+          site: currentSite,
+          allowSourceRecovery: allowSourceRecovery,
+        );
+        started = controller != null;
+      }
       if (!_isIptvPlaybackCurrent(playbackEpoch, expectedRoom)) {
         return IptvPlaybackSwitchResult.superseded;
       }

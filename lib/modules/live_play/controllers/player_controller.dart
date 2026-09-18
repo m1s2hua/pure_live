@@ -404,6 +404,7 @@ class PlayerController extends GetxController {
     LiveRoom? expectedRoom,
     Site? expectedSite,
     int? loadEpoch,
+    bool allowSourceRecovery = true,
   }) async {
     final room = expectedRoom ?? currentRoom;
     if (room == null) return null;
@@ -437,12 +438,17 @@ class PlayerController extends GetxController {
       currentLineIndex: playerState.currentLineIndex,
       currentQuality: playerState.currentQuality,
       isAudioOnly: playerState.isCurrentRoomAudioOnly,
-      sourceResolver: _buildSourceResolver(
-        site: site,
-        room: room,
-        quality: playerState.qualites[playerState.currentQuality.clamp(0, playerState.qualites.length - 1)],
-      ),
-      sourceRefreshAt: playerState.ownedSource == null
+      // A user-supplied direct source has no platform recipe to recover from.
+      // Suppressing the resolver keeps a native hiccup from silently replacing
+      // the custom URL with a freshly resolved platform stream.
+      sourceResolver: allowSourceRecovery
+          ? _buildSourceResolver(
+              site: site,
+              room: room,
+              quality: playerState.qualites[playerState.currentQuality.clamp(0, playerState.qualites.length - 1)],
+            )
+          : null,
+      sourceRefreshAt: allowSourceRecovery && playerState.ownedSource == null
           ? _getSourceRefreshAt(site: site, url: playerState.playUrlSafe)
           : null,
       sourceSelection: PlaybackSourceQualitySelection(
@@ -465,12 +471,22 @@ class PlayerController extends GetxController {
   /// directly used to omit the load epoch that protects ordinary sources.
   /// A room switch could therefore attach the older direct source after the
   /// new room had already invalidated playback work.
-  Future<VideoController?> setDirectPlayer({required LiveRoom room, required Site site}) async {
+  Future<VideoController?> setDirectPlayer({
+    required LiveRoom room,
+    required Site site,
+    bool allowSourceRecovery = true,
+  }) async {
     final roomId = room.normalizedRoomId;
     if (roomId.isEmpty) return null;
     invalidateLoad();
     final loadEpoch = _loadEpoch;
-    final controller = await setPlayer(roomId: roomId, expectedRoom: room, expectedSite: site, loadEpoch: loadEpoch);
+    final controller = await setPlayer(
+      roomId: roomId,
+      expectedRoom: room,
+      expectedSite: site,
+      loadEpoch: loadEpoch,
+      allowSourceRecovery: allowSourceRecovery,
+    );
     if (controller == null) return null;
     try {
       await controller.initialization;

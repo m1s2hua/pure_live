@@ -227,7 +227,9 @@ void main() {
     final playerSource = File('lib/modules/live_play/controllers/player_controller.dart').readAsStringSync();
 
     expect(liveSource, contains('await _initIptvPlayer(liveRoom, loadEpoch: loadEpoch)'));
-    expect(liveSource, contains('playerController.setDirectPlayer(room: expectedRoom, site: currentSite)'));
+    expect(liveSource, contains('playerController.setDirectPlayer('));
+    expect(liveSource, contains('room: expectedRoom'));
+    expect(liveSource, contains('site: currentSite'));
     expect(playerSource, contains('loadEpoch: loadEpoch'));
     expect(playerSource, contains('await controller.initialization'));
   });
