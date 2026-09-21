@@ -317,7 +317,22 @@ jobs:
       # MSIX certificate
       # -----------------------------------------------------
 
+      # Forks without the upstream signing secrets must still be able to build
+      # the EXE installer. Detect the secret once and skip the MSIX stages when
+      # it is unavailable instead of failing the whole Windows job.
+      - name: Detect MSIX signing secrets
+        shell: pwsh
+        env:
+          CERTIFICATE: ${{ secrets.CERTIFICATE }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace("$env:CERTIFICATE")) {
+            "HAS_MSIX_CERT=false" >> $env:GITHUB_ENV
+          } else {
+            "HAS_MSIX_CERT=true" >> $env:GITHUB_ENV
+          }
+
       - name: Decode MSIX Certificate
+        if: env.HAS_MSIX_CERT == 'true'
         shell: pwsh
         env:
           CERTIFICATE: ${{ secrets.CERTIFICATE }}
@@ -341,6 +356,7 @@ jobs:
           "FINAL_CERT_PATH=$certPath" >> $env:GITHUB_ENV
 
       - name: Update MSIX make_config.yaml
+        if: env.HAS_MSIX_CERT == 'true'
         shell: pwsh
         env:
           CERT_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
@@ -455,9 +471,16 @@ jobs:
       - name: Package Windows EXE and MSIX
         shell: pwsh
         run: |
-          fastforge package `
-            --platform windows `
-            --targets exe,msix
+          if ("$env:HAS_MSIX_CERT" -eq "true") {
+            fastforge package `
+              --platform windows `
+              --targets exe,msix
+          } else {
+            Write-Host "MSIX signing secret is unavailable; packaging the EXE installer only."
+            fastforge package `
+              --platform windows `
+              --targets exe
+          }
 
       # -----------------------------------------------------
       # Rename
@@ -493,13 +516,16 @@ jobs:
             Select-Object -First 1
 
           if (!$MSIX_FILE) {
-            Write-Error "Windows MSIX package not found."
+            if ("$env:HAS_MSIX_CERT" -eq "true") {
+              Write-Error "Windows MSIX package not found."
+            }
+            Write-Host "No MSIX package to rename (unsigned build)."
+          } else {
+            Copy-Item `
+              $MSIX_FILE.FullName `
+              "PureLive-$VERSION-windows-x64.msix" `
+              -Force
           }
-
-          Copy-Item `
-            $MSIX_FILE.FullName `
-            "PureLive-$VERSION-windows-x64.msix" `
-            -Force
 
       # -----------------------------------------------------
       # SHA256
