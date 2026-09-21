@@ -2,7 +2,6 @@
 
 #include <dwmapi.h>
 #include <flutter_windows.h>
-#include <windowsx.h>
 
 #include "resource.h"
 
@@ -218,29 +217,6 @@ Win32Window::MessageHandler(HWND hwnd,
         SetFocus(child_content_);
       }
       return 0;
-
-    case WM_NCHITTEST: {
-      // The title bar and its window controls are drawn by Flutter inside the
-      // client area. When the DWM frame is extended (mica / acrylic), Windows
-      // can classify the top strip as a caption, so pressing the custom
-      // minimize/maximize/close buttons is consumed as a caption click while
-      // only hover reaches Flutter. Report the client area as HTCLIENT so the
-      // Flutter controls receive pointer events. The resize borders stay
-      // outside this rectangle and are left to the default hit testing.
-      const POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
-      RECT client = {};
-      if (GetClientRect(hwnd, &client)) {
-        POINT top_left = {client.left, client.top};
-        POINT bottom_right = {client.right, client.bottom};
-        ClientToScreen(hwnd, &top_left);
-        ClientToScreen(hwnd, &bottom_right);
-        if (point.x >= top_left.x && point.x < bottom_right.x &&
-            point.y >= top_left.y && point.y < bottom_right.y) {
-          return HTCLIENT;
-        }
-      }
-      break;
-    }
 
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);

@@ -10,14 +10,12 @@
 
 namespace {
 
-// Custom-source test build: a distinct identity lets it run side by side with
-// the official install instead of forwarding to its single-instance window.
 constexpr wchar_t kPrimaryInstanceMutex[] =
-    L"Local\\PureLive_CustomSource_Primary_Instance_v1";
+    L"Local\\PureLive_Primary_Instance_v1";
 
 void BringPrimaryWindowToFront() {
   const HWND window =
-      ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"pure_live_cs");
+      ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"pure_live");
   if (window == nullptr) {
     return;
   }
@@ -72,12 +70,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     flutter::DartProject project(L"data");
 
     project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
-    SetCurrentProcessExplicitAppUserModelID(
-        L"com.mystyle.purelive.customsource");
+    SetCurrentProcessExplicitAppUserModelID(L"com.mystyle.purelive");
     FlutterWindow window(project);
     Win32Window::Point origin(10, 10);
     Win32Window::Size size(1280, 720);
-    if (!window.Create(L"pure_live_cs", origin, size)) {
+    if (!window.Create(L"pure_live", origin, size)) {
       return EXIT_FAILURE;
     }
     window.SetQuitOnClose(true);
